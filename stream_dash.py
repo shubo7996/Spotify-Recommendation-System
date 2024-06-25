@@ -3,8 +3,8 @@ import pandas as pd
 import pickle
 import numpy as np
 import plotly.express as px
-
-
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import MinMaxScaler
 # Load the pickled data
 
 track_to_recommendation = pickle.load(open('track_to_recommendation.pkl', 'rb'))
@@ -13,7 +13,8 @@ my_track_to_album_art = pickle.load(open('my_track_to_album_art.pkl', 'rb'))
 song_url=pickle.load(open('my_songs_preview_url.pkl', 'rb'))
 my_song_feature_array_dict=pickle.load(open('my_song_feature_array_dict.pkl','rb'))
 train_song_feature_array_dict=pickle.load(open('train_song_feature_array_dict.pkl','rb'))
-
+training_set_clusters=pd.read_csv('training_set_data_with_clusters.csv')
+test_set_clusters=pd.read_csv('test_set_data_with_clusters.csv')
 
 # Apply custom CSS for dark theme with card layout
 st.markdown(
@@ -180,3 +181,54 @@ selected_feature = st.selectbox('Select Feature', features)
 if selected_feature:
     fig = get_plot(selected_feature)
     st.plotly_chart(fig,use_container_width=True,theme='streamlit')
+
+
+st.title('Cluster Analysis')
+
+# Sidebar for number of clusters
+n_clusters = st.sidebar.slider('Number of Clusters', min_value=2, max_value=10, value=3)
+
+# Sidebar for selecting x and y axes
+x_axis = st.sidebar.selectbox('Select X-axis feature', features, index=0)
+y_axis = st.sidebar.selectbox('Select Y-axis feature', features, index=1)
+
+# Function to assign clusters
+combined_features = np.vstack([selected_song_features] + recommended_song_features)
+combined_df = pd.DataFrame(combined_features, columns=features)
+combined_df['Track'] = ['Selected Track'] + recommendations
+
+# Standardize the features
+scaler = MinMaxScaler()
+scaled_features = scaler.fit_transform(combined_df[features])
+
+# Perform KMeans clustering
+kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+combined_df['cluster'] = kmeans.fit_predict(scaled_features)
+
+# Plot the clusters with user-selected axes
+cluster_fig = px.scatter(combined_df, x=x_axis, y=y_axis, color='cluster', symbol='Track',
+                 title='Cluster Analysis ',
+                 labels={'cluster': 'Cluster'},
+                 template='plotly_dark')
+
+# Customize the plot for better visuals
+cluster_fig.update_traces(marker=dict(size=15, line=dict(width=2, color='DarkSlateGrey')),
+                  selector=dict(mode='markers'))
+cluster_fig.update_layout(
+    title_font_size=20,
+    title_x=0.5,
+    legend_title_text='Track Clusters',
+    legend=dict(
+        orientation="v",
+        yanchor="auto",
+        y=-0.2,
+        xanchor="right",  # Adjust the horizontal position of the legend
+        x=1,              # Move the legend to the right
+        traceorder='normal',
+        font=dict(size=12)
+    ),
+    margin=dict(l=0, r=0, t=40, b=80)  # Adjust bottom margin for legend space
+)
+
+st.plotly_chart(cluster_fig,use_container_width=True)
+# Display the data
